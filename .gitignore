@@ -6,3 +6,4 @@
 *.gdoc
 *.ppxt
 Icon
+.DS_Store
