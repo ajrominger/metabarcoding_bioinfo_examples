@@ -32,6 +32,7 @@ filterReverse <- file.path(filterPath,
 
 out <- filterAndTrim(fwd = rawForward, filt = filterForward, 
                      rev = rawReverse, filt.rev = filterReverse, 
+                     # truncLen = c(250, 230),
                      compress = TRUE, multithread = TRUE)
 
 head(out)
@@ -58,8 +59,8 @@ names(derepReverse) <- sampNames
 dadaForward <- dada(derepForward, err = errorsForward, multithread = TRUE)
 dadaReverse <- dada(derepReverse, err = errorsReverse, multithread = TRUE)
 
-dadaForward
-dadaReverse
+dadaForward[[1]]
+dadaReverse[[1]]
 
 ## Merge Paired-end Reads
 
@@ -88,5 +89,4 @@ dim(seqTabClean)
 
 # which percentage of our reads did we keep?
 sum(seqTabClean) / sum(seqTab)
-
 
