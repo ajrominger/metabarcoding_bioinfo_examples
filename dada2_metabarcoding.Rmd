@@ -1,0 +1,121 @@
+---
+title: "DNA metabarcoding with dada2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+First a great resource on *dada2*: https://www.youtube.com/watch?v=wV5_z7rR6yw&ab_channel=BrownUniversity. They're using *dada2* to analyze microbial 16S data.
+
+
+Now onto our code.  Below are code chunks without annotation.  Your job is to add text between the code chunks that describes (annotates) what's going on in your own words.
+
+## Installation
+
+Just a note: you won't need to install these packages every time (only the first time and after, e.g., updating R or re-installing R).  So you can turn this chunk of code off by adding `eval=FALSE` to the code chunk options.
+
+```{r install}
+install.packages('BiocManager')
+BiocManager::install('dada2')
+```
+
+```{r load_dada2}
+library(dada2)
+```
+
+## Filtering and Trimming
+
+```{r filter}
+# setting up path to data
+dataPath <- 'data'
+
+rawForward <- list.files(dataPath, pattern="_R1_001.fastq", full.names = TRUE)
+rawReverse <- list.files(dataPath, pattern="_R2_001.fastq", full.names = TRUE)
+sampNames <- gsub('data/|_.*', '', rawForward)
+
+# check quality
+plotQualityProfile(rawForward)
+plotQualityProfile(rawReverse)
+
+# filtering
+filterPath <- file.path(dataPath, "filtered")
+
+filterForward <- file.path(filterPath,
+                           paste0(sampNames, "_R1_trimmed.fastq.gz"))
+
+filterReverse <- file.path(filterPath,
+                           paste0(sampNames, "_R2_trimmed.fastq.gz"))
+
+
+out <- filterAndTrim(fwd = rawForward, filt = filterForward, 
+                     rev = rawReverse, filt.rev = filterReverse, 
+                     compress = TRUE, multithread = TRUE)
+
+head(out)
+```
+
+
+## Learn the Error Rates
+
+```{r learn_errors}
+errorsForward <- learnErrors(filterForward, multithread = TRUE)
+errorsReverse <- learnErrors(filterReverse, multithread = TRUE)
+
+plotErrors(errorsForward[1:2], nominalQ = TRUE)
+plotErrors(errorsReverse[1:2], nominalQ = TRUE)
+```
+
+
+## Dereplication
+
+```{r derep}
+derepForward <- derepFastq(filterForward, verbose = TRUE)
+derepReverse <- derepFastq(filterReverse, verbose = TRUE)
+
+names(derepForward) <- sampNames
+names(derepReverse) <- sampNames
+```
+
+## Sequence inference
+
+```{r dada}
+dadaForward <- dada(derepForward, err = errorsForward, multithread = TRUE)
+dadaReverse <- dada(derepReverse, err = errorsReverse, multithread = TRUE)
+
+dadaForward
+dadaReverse
+```
+
+## Merge Paired-end Reads
+
+```{r pair-end}
+merged <- mergePairs(dadaForward, derepForward, 
+                     dadaReverse, derepReverse, 
+                     verbose = TRUE)
+
+# inspect the merger data.frame from the first sample
+head(merged[[1]])
+```
+
+## Construct ASV Table
+
+```{r asv}
+seqTab <- makeSequenceTable(merged)
+dim(seqTab)
+
+# inspect distribution of sequence lengths
+table(nchar(getSequences(seqTab)))
+```
+
+## Remove Chimeras
+
+```{r chimera}
+seqTabClean <- removeBimeraDenovo(seqTab, method = 'consensus',
+                                  multithread = TRUE, verbose = TRUE)
+dim(seqTabClean)
+
+# which percentage of our reads did we keep?
+sum(seqTabClean) / sum(seqTab)
+```
